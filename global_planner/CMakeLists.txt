@@ -13,6 +13,7 @@ find_package(catkin REQUIRED
     pluginlib
     roscpp
     tf
+    base_local_planner
 )
 
 generate_dynamic_reconfigure_options(

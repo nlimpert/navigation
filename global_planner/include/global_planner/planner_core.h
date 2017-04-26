@@ -53,6 +53,8 @@
 #include <global_planner/traceback.h>
 #include <global_planner/orientation_filter.h>
 #include <global_planner/GlobalPlannerConfig.h>
+#include <base_local_planner/world_model.h>
+#include <base_local_planner/costmap_model.h>
 
 namespace global_planner {
 
@@ -164,12 +166,16 @@ class GlobalPlanner : public nav_core::BaseGlobalPlanner {
 
         bool makePlanService(nav_msgs::GetPlan::Request& req, nav_msgs::GetPlan::Response& resp);
 
+        double footprintCost(double x_i, double y_i, double theta_i);
+
+
     protected:
 
         /**
          * @brief Store a copy of the current costmap in \a costmap.  Called by makePlan.
          */
         costmap_2d::Costmap2D* costmap_;
+        costmap_2d::Costmap2DROS* costmap_ros_;
         std::string frame_id_;
         ros::Publisher plan_pub_;
         bool initialized_, allow_unknown_, visualize_potential_;
@@ -201,6 +207,8 @@ class GlobalPlanner : public nav_core::BaseGlobalPlanner {
 
         bool old_navfn_behavior_;
         float convert_offset_;
+        base_local_planner::WorldModel* world_model_;
+
 
         dynamic_reconfigure::Server<global_planner::GlobalPlannerConfig> *dsrv_;
         void reconfigureCB(global_planner::GlobalPlannerConfig &config, uint32_t level);
