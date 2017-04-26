@@ -89,6 +89,7 @@ GlobalPlanner::~GlobalPlanner() {
 }
 
 void GlobalPlanner::initialize(std::string name, costmap_2d::Costmap2DROS* costmap_ros) {
+    costmap_ros_ = costmap_ros;
     initialize(name, costmap_ros->getCostmap(), costmap_ros->getGlobalFrameID());
 }
 
@@ -159,6 +160,7 @@ void GlobalPlanner::initialize(std::string name, costmap_2d::Costmap2D* costmap,
         dsrv_->setCallback(cb);
 
         initialized_ = true;
+        world_model_ = new base_local_planner::CostmapModel(*costmap_);
     } else
         ROS_WARN("This planner has already been initialized, you can't call it twice, doing nothing");
 
@@ -233,11 +235,12 @@ bool GlobalPlanner::makePlan(const geometry_msgs::PoseStamped& start, const geom
 
     ros::NodeHandle n;
     std::string global_frame = frame_id_;
+    geometry_msgs::PoseStamped goal_ = goal;
 
     //until tf can handle transforming things that are way in the past... we'll require the goal to be in our global frame
-    if (tf::resolve(tf_prefix_, goal.header.frame_id) != tf::resolve(tf_prefix_, global_frame)) {
+    if (tf::resolve(tf_prefix_, goal_.header.frame_id) != tf::resolve(tf_prefix_, global_frame)) {
         ROS_ERROR(
-                "The goal pose passed to this planner must be in the %s frame.  It is instead in the %s frame.", tf::resolve(tf_prefix_, global_frame).c_str(), tf::resolve(tf_prefix_, goal.header.frame_id).c_str());
+                "The goal pose passed to this planner must be in the %s frame.  It is instead in the %s frame.", tf::resolve(tf_prefix_, global_frame).c_str(), tf::resolve(tf_prefix_, goal_.header.frame_id).c_str());
         return false;
     }
 
@@ -245,6 +248,81 @@ bool GlobalPlanner::makePlan(const geometry_msgs::PoseStamped& start, const geom
         ROS_ERROR(
                 "The start pose passed to this planner must be in the %s frame.  It is instead in the %s frame.", tf::resolve(tf_prefix_, global_frame).c_str(), tf::resolve(tf_prefix_, start.header.frame_id).c_str());
         return false;
+    }
+
+    if (default_tolerance_ > 0.0) {
+        // try to fix the goal if needed according to the carrot_planner method
+        // instead of point the goal towards the robot
+        // the goal is moved according to the direction given by the orientation
+
+        tf::Stamped<tf::Pose> goal_tf;
+        tf::Stamped<tf::Pose> start_tf;
+
+        poseStampedMsgToTF(goal_,goal_tf);
+        poseStampedMsgToTF(start,start_tf);
+
+        double useless_pitch, useless_roll, goal_yaw, start_yaw;
+        start_tf.getBasis().getEulerYPR(start_yaw, useless_pitch, useless_roll);
+        goal_tf.getBasis().getEulerYPR(goal_yaw, useless_pitch, useless_roll);
+
+        //we want to step back along the vector created by the robot's position and the goal pose until we find a legal cell
+        double goal_x = goal_.pose.position.x;
+        double goal_y = goal_.pose.position.y;
+
+        double start_x = goal_x;
+        double start_y = goal_y;
+
+        double target_x = goal_.pose.position.x;
+        double target_y = goal_.pose.position.y;
+        double target_yaw = goal_yaw;
+
+        double diff_x = cos(goal_yaw);
+        double diff_y = sin(goal_yaw);
+//        double diff_yaw = angles::normalize_angle(goal_yaw-start_yaw);
+
+        bool done = false;
+        double scale = 0.0;
+        double dScale = 0.005;
+
+        double step_x = dScale * diff_x;
+        double step_y = dScale * diff_y;
+
+        while(!done)
+        {
+          if(scale > default_tolerance_)
+          {
+            target_x = goal_x;
+            target_y = goal_y;
+            target_yaw = goal_yaw;
+            ROS_WARN("The carrot planner could not find a valid plan for this goal");
+            break;
+          }
+//          target_x = start_x - scale * diff_x;
+//          target_y = start_y - scale * diff_y;
+          target_x -= step_x;
+          target_y -= step_y;
+          target_yaw = goal_yaw;
+//          target_yaw = angles::normalize_angle(start_yaw + scale * diff_yaw);
+
+          double footprint_cost = footprintCost(target_x, target_y, target_yaw);
+//          ROS_INFO("footprint_cost: %f", footprint_cost);
+          if(footprint_cost >= double(costmap_2d::FREE_SPACE) && footprint_cost <= 200.0)
+          {
+//              ROS_WARN("Corrected goal with scale: %f", scale);
+              done = true;
+          }
+          scale +=dScale;
+        }
+
+        goal_tf.setRotation(tf::createQuaternionFromYaw(target_yaw));
+        goal_tf.setOrigin(tf::Vector3(target_x, target_y, 0.0));
+
+        goal_.pose.position.x = goal_tf.getOrigin().x();
+        goal_.pose.position.y = goal_tf.getOrigin().y();
+        goal_.pose.orientation.x = goal_tf.getRotation().x();
+        goal_.pose.orientation.y = goal_tf.getRotation().y();
+        goal_.pose.orientation.z = goal_tf.getRotation().z();
+        goal_.pose.orientation.w = goal_tf.getRotation().w();
     }
 
     double wx = start.pose.position.x;
@@ -265,8 +343,8 @@ bool GlobalPlanner::makePlan(const geometry_msgs::PoseStamped& start, const geom
         worldToMap(wx, wy, start_x, start_y);
     }
 
-    wx = goal.pose.position.x;
-    wy = goal.pose.position.y;
+    wx = goal_.pose.position.x;
+    wy = goal_.pose.position.y;
 
     if (!costmap_->worldToMap(wx, wy, goal_x_i, goal_y_i)) {
         ROS_WARN_THROTTLE(1.0,
@@ -305,9 +383,9 @@ bool GlobalPlanner::makePlan(const geometry_msgs::PoseStamped& start, const geom
 
     if (found_legal) {
         //extract the plan
-        if (getPlanFromPotential(start_x, start_y, goal_x, goal_y, goal, plan)) {
+        if (getPlanFromPotential(start_x, start_y, goal_x, goal_y, goal_, plan)) {
             //make sure the goal we push on has the same timestamp as the rest of the plan
-            geometry_msgs::PoseStamped goal_copy = goal;
+            geometry_msgs::PoseStamped goal_copy = goal_;
             goal_copy.header.stamp = ros::Time::now();
             plan.push_back(goal_copy);
         } else {
@@ -433,6 +511,24 @@ void GlobalPlanner::publishPotential(float* potential)
             grid.data[i] = potential_array_[i] * publish_scale_ / max;
     }
     potential_pub_.publish(grid);
+}
+
+//we need to take the footprint of the robot into account when we calculate cost to obstacles
+double GlobalPlanner::footprintCost(double x_i, double y_i, double theta_i)
+{
+  if(!initialized_){
+    ROS_ERROR("The planner has not been initialized, please call initialize() to use the planner");
+    return -1.0;
+  }
+
+  std::vector<geometry_msgs::Point> footprint = costmap_ros_->getRobotFootprint();
+  //if we have no footprint... do nothing
+  if(footprint.size() < 3)
+    return -1.0;
+
+  //check if the footprint is legal
+  double footprint_cost = world_model_->footprintCost(x_i, y_i, theta_i, footprint);
+  return footprint_cost;
 }
 
 } //end namespace global_planner
