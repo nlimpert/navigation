@@ -9,6 +9,7 @@ find_package(catkin REQUIRED
             pluginlib
             roscpp
             tf
+            std_srvs
         )
 
 find_package(Eigen3 REQUIRED)
