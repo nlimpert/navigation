@@ -251,7 +251,7 @@ bool GlobalPlanner::makePlan(const geometry_msgs::PoseStamped& start, const geom
         return false;
     }
 
-    if (default_tolerance_ > 0.0) {
+    if (default_tolerance_ > 0.0 && allow_backprojection) {
         // try to fix the goal if needed according to the carrot_planner method
         // instead of point the goal towards the robot
         // the goal is moved according to the direction given by the orientation
@@ -288,7 +288,7 @@ bool GlobalPlanner::makePlan(const geometry_msgs::PoseStamped& start, const geom
         double step_x = dScale * diff_x;
         double step_y = dScale * diff_y;
 
-        while(!done && allow_backprojection)
+        while(!done)
         {
           if(scale > default_tolerance_)
           {
