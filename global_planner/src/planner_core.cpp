@@ -171,6 +171,7 @@ void GlobalPlanner::reconfigureCB(global_planner::GlobalPlannerConfig& config, u
     publish_potential_ = config.publish_potential;
     orientation_filter_->setMode(config.orientation_mode);
     orientation_filter_->setWindowSize(config.orientation_window_size);
+    allow_backprojection = config.allow_backprojection;
 }
 
 void GlobalPlanner::clearRobotCell(const tf::Stamped<tf::Pose>& global_pose, unsigned int mx, unsigned int my) {
@@ -285,7 +286,7 @@ bool GlobalPlanner::makePlan(const geometry_msgs::PoseStamped& start, const geom
         double step_x = dScale * diff_x;
         double step_y = dScale * diff_y;
 
-        while(!done)
+        while(!done && allow_backprojection)
         {
           if(scale > default_tolerance_)
           {
@@ -308,6 +309,7 @@ bool GlobalPlanner::makePlan(const geometry_msgs::PoseStamped& start, const geom
           {
 //              ROS_WARN("Corrected goal with scale: %f", scale);
               done = true;
+              allow_backprojection = false;
           }
           scale +=dScale;
         }
