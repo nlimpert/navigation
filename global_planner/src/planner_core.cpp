@@ -281,7 +281,7 @@ bool GlobalPlanner::makePlan(const geometry_msgs::PoseStamped& start, const geom
 
         bool done = false;
         double scale = 0.0;
-        double dScale = 0.005;
+        double dScale = 0.001;
 
         double step_x = dScale * diff_x;
         double step_y = dScale * diff_y;
@@ -305,11 +305,13 @@ bool GlobalPlanner::makePlan(const geometry_msgs::PoseStamped& start, const geom
 
           double footprint_cost = footprintCost(target_x, target_y, target_yaw);
 //          ROS_INFO("footprint_cost: %f", footprint_cost);
-          if(footprint_cost >= double(costmap_2d::FREE_SPACE) && footprint_cost <= 200.0)
+          if(footprint_cost >= double(costmap_2d::FREE_SPACE) && footprint_cost <= 253.0)
           {
 //              ROS_WARN("Corrected goal with scale: %f", scale);
               done = true;
               allow_backprojection = false;
+              goal_x = target_x;
+              goal_y = target_y;
           }
           scale +=dScale;
         }
