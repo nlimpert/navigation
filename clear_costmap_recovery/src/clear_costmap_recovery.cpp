@@ -83,76 +83,26 @@ void ClearCostmapRecovery::runBehavior(){
     return;
   }
 
-  if(global_costmap_ == NULL || local_costmap_ == NULL){
-    ROS_ERROR("The costmaps passed to the ClearCostmapRecovery object cannot be NULL. Doing nothing.");
-    return;
+  std_srvs::Empty srv;
+  client.call(srv);
+
+  dynamic_reconfigure::ReconfigureRequest dynreconf_srv_req;
+  dynamic_reconfigure::ReconfigureResponse dynreconf_srv_resp;
+  dynamic_reconfigure::BoolParameter dynreconf_bool_param;
+  dynamic_reconfigure::Config dynreconf_conf;
+
+  dynreconf_bool_param.name = "allow_backprojection";
+  dynreconf_bool_param.value = true;
+  dynreconf_conf.bools.push_back(dynreconf_bool_param);
+  dynreconf_srv_req.config = dynreconf_conf;
+
+  if (! ros::service::call("/move_base/GlobalPlanner/set_parameters", dynreconf_srv_req, dynreconf_srv_resp)) {
+      ROS_ERROR("Failed to send dynreconf");
+      dynreconf_conf.doubles.clear();
+  } else {
+      ROS_ERROR("Sent dynreconf to global planner");
+      dynreconf_conf.doubles.clear();
   }
-  ROS_WARN("Clearing costmap to unstuck robot (%fm).", reset_distance_);
-  clear(global_costmap_);
-  clear(local_costmap_);
-}
-
-void ClearCostmapRecovery::clear(costmap_2d::Costmap2DROS* costmap){
-  std::vector<boost::shared_ptr<costmap_2d::Layer> >* plugins = costmap->getLayeredCostmap()->getPlugins();
-
-  tf::Stamped<tf::Pose> pose;
-
-  if(!costmap->getRobotPose(pose)){
-    ROS_ERROR("Cannot clear map because pose cannot be retrieved");
-    return;
-  }
-
-  double x = pose.getOrigin().x();
-  double y = pose.getOrigin().y();
-
-  for (std::vector<boost::shared_ptr<costmap_2d::Layer> >::iterator pluginp = plugins->begin(); pluginp != plugins->end(); ++pluginp) {
-    boost::shared_ptr<costmap_2d::Layer> plugin = *pluginp;
-    std::string name = plugin->getName();
-    int slash = name.rfind('/');
-    if( slash != std::string::npos ){
-        name = name.substr(slash+1);
-    }
-
-    if(clearable_layers_.count(name)!=0){
-      boost::shared_ptr<costmap_2d::CostmapLayer> costmap;
-      costmap = boost::static_pointer_cast<costmap_2d::CostmapLayer>(plugin);
-      clearMap(costmap, x, y);
-    }
-  }
-}
-
-
-void ClearCostmapRecovery::clearMap(boost::shared_ptr<costmap_2d::CostmapLayer> costmap, 
-                                        double pose_x, double pose_y){
-  boost::unique_lock<costmap_2d::Costmap2D::mutex_t> lock(*(costmap->getMutex()));
- 
-  double start_point_x = pose_x - reset_distance_ / 2;
-  double start_point_y = pose_y - reset_distance_ / 2;
-  double end_point_x = start_point_x + reset_distance_;
-  double end_point_y = start_point_y + reset_distance_;
-
-  int start_x, start_y, end_x, end_y;
-  costmap->worldToMapNoBounds(start_point_x, start_point_y, start_x, start_y);
-  costmap->worldToMapNoBounds(end_point_x, end_point_y, end_x, end_y);
-
-  unsigned char* grid = costmap->getCharMap();
-  for(int x=0; x<(int)costmap->getSizeInCellsX(); x++){
-    bool xrange = x>start_x && x<end_x;
-                   
-    for(int y=0; y<(int)costmap->getSizeInCellsY(); y++){
-      if(xrange && y>start_y && y<end_y)
-        continue;
-      int index = costmap->getIndex(x,y);
-      if(grid[index]!=NO_INFORMATION){
-        grid[index] = NO_INFORMATION;
-      }
-    }
-  }
-
-  double ox = costmap->getOriginX(), oy = costmap->getOriginY();
-  double width = costmap->getSizeInMetersX(), height = costmap->getSizeInMetersY();
-  costmap->addExtraBounds(ox, oy, ox + width, oy + height);
-  return;
 }
 
 };
