@@ -305,7 +305,7 @@ bool GlobalPlanner::makePlan(const geometry_msgs::PoseStamped& start, const geom
 
           double footprint_cost = footprintCost(target_x, target_y, target_yaw);
 //          ROS_INFO("footprint_cost: %f", footprint_cost);
-          if(footprint_cost >= double(costmap_2d::FREE_SPACE) && footprint_cost <= 253.0)
+          if(footprint_cost >= double(costmap_2d::FREE_SPACE) && footprint_cost <= 220.0)
           {
 //              ROS_WARN("Corrected goal with scale: %f", scale);
               done = true;
