@@ -311,7 +311,6 @@ bool GlobalPlanner::makePlan(const geometry_msgs::PoseStamped& start, const geom
           {
 //              ROS_WARN("Corrected goal with scale: %f", scale);
               done = true;
-              allow_backprojection = false;
               goal_x = target_x;
               goal_y = target_y;
           }
