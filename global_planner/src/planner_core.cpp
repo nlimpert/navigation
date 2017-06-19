@@ -295,7 +295,7 @@ bool GlobalPlanner::makePlan(const geometry_msgs::PoseStamped& start, const geom
             target_x = goal_x;
             target_y = goal_y;
             target_yaw = goal_yaw;
-            ROS_WARN("The carrot planner could not find a valid plan for this goal");
+            ROS_WARN("The carrot planner method could not find a valid plan for this goal");
             break;
           }
 //          target_x = start_x - scale * diff_x;
