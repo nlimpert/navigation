@@ -970,7 +970,15 @@ namespace move_base {
             as_->setAborted(move_base_msgs::MoveBaseResult(), "Robot is oscillating. Even after executing recovery behaviors.");
           }
           resetState();
-          return true;
+
+          //Restart costmaps as we still need them
+          if(shutdown_costmaps_){
+            ROS_DEBUG_NAMED("move_base","Stopping costmaps");
+            planner_costmap_ros_->start();
+            controller_costmap_ros_->start();
+          }
+
+          return false;
         }
         break;
       default:
