@@ -1120,6 +1120,7 @@ namespace move_base {
   void MoveBase::resetState(){
     // Disable the planner thread
     boost::unique_lock<boost::recursive_mutex> lock(planner_mutex_);
+    ROS_ERROR("RESET STATE!!!");
     runPlanner_ = false;
     lock.unlock();
 
