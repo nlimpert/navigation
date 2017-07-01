@@ -87,7 +87,6 @@ namespace potential_field_recovery{
       double sim_granularity_, max_rotational_vel_, max_trans_vel_, acc_lim_th_, tolerance_, frequency_;
       double min_dist_;
       base_local_planner::CostmapModel* world_model_;
-      bool write_spam_info_;
 
       ros::Publisher marker_pub;
   };

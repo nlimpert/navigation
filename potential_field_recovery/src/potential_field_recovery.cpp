@@ -61,8 +61,7 @@ void PotentialFieldRecovery::initialize(std::string name, tf::TransformListener*
     //we'll simulate every degree by default
     private_nh.param("sim_granularity", sim_granularity_, 0.017);
     private_nh.param("frequency", frequency_, 20.0);
-    private_nh.param("write_spam_debug", write_spam_info_, true);
-    private_nh.param("min_dist", min_dist_, 0.6);
+    private_nh.param("min_dist", min_dist_, 0.4);
 
     blp_nh.param("max_trans_vel", max_trans_vel_, 0.3);
     blp_nh.param("max_rotational_vel", max_rotational_vel_, 0.2);
@@ -119,17 +118,6 @@ void PotentialFieldRecovery::runBehavior(){
 
     double footprint_cost = world_model_->footprintCost(robot_x, robot_y, robot_ori, local_costmap_->getRobotFootprint(), 0.0, 0.0);
 
-    ROS_INFO("footprint_cost: %f", footprint_cost);
-
-//    if (footprint_cost >= 0.0) {
-//        break;
-//    }
-
-
-
-//    double norm_angle = angles::normalize_angle(tf::getYaw(global_pose.getRotation()));
-//    current_angle = angles::normalize_angle(norm_angle + start_offset);
-
     unsigned int width = local_costmap_->getCostmap()->getSizeInCellsX();
     unsigned int height = local_costmap_->getCostmap()->getSizeInCellsY();
     double cur_world_x = 0.0;
@@ -160,7 +148,6 @@ void PotentialFieldRecovery::runBehavior(){
       for (int posY = 0; posY < height; ++posY) {
         float cellCost = local_costmap_->getCostmap()->getCost(posX, posY);
         local_costmap_->getCostmap()->mapToWorld(posX, posY, cur_world_x, cur_world_y);
-        ROS_INFO("cellCost at %i %i : %f\tx:%f y:%f res: %f", posX, posY, cellCost, cur_world_x, cur_world_y, local_costmap_->getCostmap()->getResolution());
         if (local_costmap_->getCostmap()->getCost(posX, posY) != costmap_2d::FREE_SPACE) {
           double dx = cur_world_x - cur_robot_x;
           double dy = cur_world_y - cur_robot_y;
@@ -177,14 +164,12 @@ void PotentialFieldRecovery::runBehavior(){
             float factor = 1.f / ( (dx*dx + dy*dy) * (dx*dx + dy*dy) );
 
             float d = sqrt( dx * dx + dy * dy );
-            ROS_INFO("d: %f", d);
             if (d < cur_min_dist) {
                 cur_min_dist = d;
             }
 
             target_x -= factor * dx;
             target_y -= factor * dy;
-//            ROS_INFO("x:\t%f y:\t%f factor:\t%f, tx:\t%f ty:\t%f", dx, dy, factor, target_x, target_y);
           }
         }
       }
@@ -193,25 +178,11 @@ void PotentialFieldRecovery::runBehavior(){
     marker_pub.publish(points);
     points.points.clear();
 
-    ROS_INFO("cur_min_dist: %f",cur_min_dist);
     if (cur_min_dist >= min_dist_) {
         break;
     }
 
-//    target_r   = sqrt( target_x*target_x + target_y*target_y );
-//    ROS_INFO("tan:\t%f", atan2(target_y, target_x));
-//    ROS_INFO("robot_ori:\t%f", robot_ori);
     target_phi = angles::normalize_angle(atan2(target_y, target_x) - robot_ori);
-//    ROS_INFO("target_phi:\t%f", target_phi);
-
-    if (write_spam_info_) {
-//      ROS_INFO_NAMED("EscapePotentialFieldOmniDriveModule","Target vector: x: %f\t y: %f", target_x, target_y);
-//      ROS_INFO_NAMED("EscapePotentialFieldOmniDriveModule","Target vector: phi: %f\t%f", target_phi, target_r);
-    }
-
-//    float angle_difference = M_PI_2 - 0.2f;
-//    float angle     = normalize_angle(target.phi);
-//    float angle_abs = fabs( angle );
 
     float drive_part_x    = 0.f;
     float drive_part_y    = 0.f;
@@ -227,57 +198,7 @@ void PotentialFieldRecovery::runBehavior(){
     cmd_vel.linear.x = drive_part_x * max_trans_vel_;
     cmd_vel.linear.y = drive_part_y * max_trans_vel_;
 
-    if (write_spam_info_) {
-//      ROS_INFO_NAMED("EscapePotentialFieldOmniDriveModule","Target vector: x: %f\t y: %f", drive_part_x, drive_part_x);
-//      ROS_INFO_NAMED("EscapePotentialFieldOmniDriveModule","Velocity vector: x: %f\t y: %f", cmd_vel.linear.x, cmd_vel.linear.y);
-    }
-
     vel_pub.publish(cmd_vel);
-
-/*
-    //compute the distance left to potential_field
-    double dist_left = M_PI - current_angle;
-
-    double x = global_pose.getOrigin().x(), y = global_pose.getOrigin().y();
-
-    //check if that velocity is legal by forward simulating
-    double sim_angle = 0.0;
-    while(sim_angle < dist_left){
-      double theta = tf::getYaw(global_pose.getRotation()) + sim_angle;
-
-      //make sure that the point is legal, if it isn't... we'll abort
-      double footprint_cost = world_model_->footprintCost(x, y, theta, local_costmap_->getRobotFootprint(), 0.0, 0.0);
-      if(footprint_cost < 0.0){
-        ROS_ERROR("PotentialField recovery can't potential_field in place because there is a potential collision. Cost: %.2f", footprint_cost);
-        return;
-      }
-
-      sim_angle += sim_granularity_;
-    }
-
-    //compute the velocity that will let us stop by the time we reach the goal
-    double vel = sqrt(2 * acc_lim_th_ * dist_left);
-
-    //make sure that this velocity falls within the specified limits
-    vel = std::min(std::max(vel, min_rotational_vel_), max_rotational_vel_);
-
-    geometry_msgs::Twist cmd_vel;
-    cmd_vel.linear.x = 0.0;
-    cmd_vel.linear.y = 0.0;
-    cmd_vel.angular.z = vel;
-
-    vel_pub.publish(cmd_vel);
-
-    //makes sure that we won't decide we're done right after we start
-    if(current_angle < 0.0)
-      got_180 = true;
-
-    //if we're done with our in-place rotation... then return
-    if(got_180 && current_angle >= (0.0 - tolerance_))
-      return;
-
-    r.sleep();
-*/
   }
 }
 };
