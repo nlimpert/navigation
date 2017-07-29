@@ -225,6 +225,11 @@ class GlobalPlanner : public nav_core::BaseGlobalPlanner {
 
         ros::Publisher marker_pub;
 
+        double last_goal_x;
+        double last_goal_y;
+        double last_official_goal_x;
+        double last_official_goal_y;
+
 };
 
 } //end namespace global_planner
