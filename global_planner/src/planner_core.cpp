@@ -163,6 +163,8 @@ void GlobalPlanner::initialize(std::string name, costmap_2d::Costmap2D* costmap,
         initialized_ = true;
         world_model_ = new base_local_planner::CostmapModel(*costmap_);
         marker_pub = private_nh.advertise<visualization_msgs::Marker>("visualization_marker_recovery", 10);
+        last_official_goal_x = 0.;
+        last_official_goal_y = 0.;
     } else
         ROS_WARN("This planner has already been initialized, you can't call it twice, doing nothing");
 
@@ -228,6 +230,15 @@ bool GlobalPlanner::makePlan(const geometry_msgs::PoseStamped& start, const geom
 bool GlobalPlanner::makePlan(const geometry_msgs::PoseStamped& start, const geometry_msgs::PoseStamped& goal,
                            double tolerance, std::vector<geometry_msgs::PoseStamped>& plan) {
     boost::mutex::scoped_lock lock(mutex_);
+
+    // reset last_official_goal if it diverges
+    if (fabs(last_official_goal_x - goal.pose.position.x) > 0.1 || fabs(last_official_goal_y - goal.pose.position.y) > 0.1) {
+      last_official_goal_x = goal.pose.position.x;
+      last_official_goal_y = goal.pose.position.y;
+      last_goal_x = 0.;
+      last_goal_y = 0.;
+      ROS_INFO("NEW GOAL");
+    }
     if (!initialized_) {
         ROS_ERROR(
                 "This planner has not been initialized yet, but it is being used, please call initialize() before use");
@@ -254,7 +265,6 @@ bool GlobalPlanner::makePlan(const geometry_msgs::PoseStamped& start, const geom
         return false;
     }
 
-    if (default_tolerance_ > 0.0 && allow_backprojection) {
       // Potential field method to find a cell with a cost
       // less than or equal given the value pot_field_max_cost.
       // Fail on timeout
@@ -321,51 +331,67 @@ bool GlobalPlanner::makePlan(const geometry_msgs::PoseStamped& start, const geom
       points.color.g = 1.0;
       points.color.a = 0.2;
 
-      while(cur_cost > pot_field_max_cost_) {
-        for (int x = min_x; x < max_x; ++x) {
-          for (int y = min_y; y < max_y; ++y) {
+      // update costs and start potential field if we do not have a valid goal
+      worldCost(last_goal_x, last_goal_y, cur_cost);
 
-            costmap_->mapToWorld(x, y, cur_world_x, cur_world_y);
-            if (costmap_->getCost(x, y) < pot_field_max_cost_) {
-              double dx = cur_world_x - goal.pose.position.x;
-              double dy = cur_world_y - goal.pose.position.y;
+      if (cur_cost > pot_field_max_cost_) {
+        ROS_INFO("RESETTING! %u", (unsigned int) cur_cost);
 
-              geometry_msgs::Point p;
-              p.x = cur_world_x;
-              p.y = cur_world_y;
-              p.z = 0.0;
+        while(cur_cost > pot_field_max_cost_) {
+          for (int x = min_x; x < max_x; ++x) {
+            for (int y = min_y; y < max_y; ++y) {
 
-              points.points.push_back(p);
+              costmap_->mapToWorld(x, y, cur_world_x, cur_world_y);
+              if (costmap_->getCost(x, y) < pot_field_max_cost_) {
+                double dx = cur_world_x - goal.pose.position.x;
+                double dy = cur_world_y - goal.pose.position.y;
 
-              if (fabs(dx) >= 0.01 && fabs(dy) >= 0.01) {
-                //Assign a lower factor for objects at larger distances
-                float factor = 1.f / ( (dx*dx + dy*dy) * (dx*dx + dy*dy));
+                geometry_msgs::Point p;
+                p.x = cur_world_x;
+                p.y = cur_world_y;
+                p.z = 0.0;
 
-                pot_field_target_x -= factor * dx;
-                pot_field_target_y -= factor * dy;
+                points.points.push_back(p);
+
+                if (fabs(dx) >= 0.01 && fabs(dy) >= 0.01) {
+                  //Assign a lower factor for objects at larger distances
+                  float factor = 1.f / ( (dx*dx + dy*dy) * (dx*dx + dy*dy));
+
+                  pot_field_target_x -= factor * dx;
+                  pot_field_target_y -= factor * dy;
+                }
               }
             }
           }
-        }
-        marker_pub.publish(points);
-        points.points.clear();
+            marker_pub.publish(points);
+            points.points.clear();
 
-        if (ros::Time::now() - begin > ros::Duration(POT_FIELD_TIMEOUT)) {
-            ROS_ERROR_NAMED("global planner", "Failed to find a point via potential field "
-                                              "in the map within %f seconds", POT_FIELD_TIMEOUT);
-            break;
-        }
+          if (ros::Time::now() - begin > ros::Duration(POT_FIELD_TIMEOUT)) {
+              ROS_ERROR_NAMED("global planner", "Failed to find a point via potential field "
+                                                "in the map within %f seconds", POT_FIELD_TIMEOUT);
+              break;
+          }
 
-        pot_field_target_phi = angles::normalize_angle(atan2(pot_field_target_y, pot_field_target_x));
+          pot_field_target_phi = angles::normalize_angle(atan2(pot_field_target_y, pot_field_target_x));
 
-        float cur_x = std::cos(pot_field_target_phi) * (costmap_->getResolution() * 0.5);
-        float cur_y = std::sin(pot_field_target_phi) * (costmap_->getResolution() * 0.5);
+          float cur_x = std::cos(pot_field_target_phi) * (costmap_->getResolution() * 0.5);
+          float cur_y = std::sin(pot_field_target_phi) * (costmap_->getResolution() * 0.5);
 
-        cur_goal_x -= cur_x;
-        cur_goal_y -= cur_y;
+          cur_goal_x -= cur_x;
+          cur_goal_y -= cur_y;
 
-        worldCost(cur_goal_x, cur_goal_y, cur_cost);
-        }
+          worldCost(cur_goal_x, cur_goal_y, cur_cost);
+          }
+
+        last_goal_x = cur_goal_x;
+        last_goal_y = cur_goal_y;
+
+        unsigned char cost_at_further_goal = 255;
+        worldCost(last_goal_x, last_goal_y, cost_at_further_goal);
+
+        ROS_INFO("costs at %f %f: %u", last_goal_x, last_goal_y, (unsigned int) cost_at_further_goal);
+
+
 
       //////////////////////////////////////////////////
       visualization_msgs::Marker arrow;
@@ -391,11 +417,12 @@ bool GlobalPlanner::makePlan(const geometry_msgs::PoseStamped& start, const geom
 
       marker_pub.publish(arrow);
       //////////////////////////////////////////////////
-
-      goal_.pose.position.x = cur_goal_x;
-      goal_.pose.position.y = cur_goal_y;
-
     }
+
+
+
+    goal_.pose.position.x = last_goal_x;
+    goal_.pose.position.y = last_goal_y;
 
     double wx = start.pose.position.x;
     double wy = start.pose.position.y;
