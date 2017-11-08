@@ -233,9 +233,9 @@ bool GlobalPlanner::makePlan(const geometry_msgs::PoseStamped& start, const geom
     if (fabs(last_official_goal_x - goal.pose.position.x) > 0.1 || fabs(last_official_goal_y - goal.pose.position.y) > 0.1) {
       last_official_goal_x = goal.pose.position.x;
       last_official_goal_y = goal.pose.position.y;
-      last_goal_x = 0.;
-      last_goal_y = 0.;
-      ROS_INFO("NEW GOAL");
+      last_goal_x = goal.pose.position.x;
+      last_goal_y = goal.pose.position.y;
+      ROS_INFO("NEW GOAL, setting last goal to: %f %f", last_goal_x, last_goal_y);
     }
     if (!initialized_) {
         ROS_ERROR(
