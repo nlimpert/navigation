@@ -469,7 +469,7 @@ bool GlobalPlanner::worldCost(double wx, double wy, unsigned char &cost) {
   unsigned int wx_int, wy_int;
 
   if (!costmap_->worldToMap(wx, wy, wx_int, wy_int)) {
-      ROS_ERROR_NAMED("global planner", "Unable to get world to map coordinates for %f, %f -> out of map bounds");
+      ROS_ERROR_NAMED("global planner", "Unable to get world to map coordinates for %f, %f -> out of map bounds", wx, wy);
       return false;
   }
 
