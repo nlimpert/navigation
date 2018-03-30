@@ -282,7 +282,7 @@ bool GlobalPlanner::makePlan(const geometry_msgs::PoseStamped& start, const geom
       int width = (int) costmap_->getSizeInCellsX();
       int height = (int) costmap_->getSizeInCellsY();
 
-      int max_num_cells = default_tolerance_ / costmap_->getResolution();
+      int max_num_cells = tolerance / costmap_->getResolution();
 
       unsigned int offset_x = 0;
       unsigned int offset_y = 0;
