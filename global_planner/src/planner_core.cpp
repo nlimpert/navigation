@@ -239,16 +239,26 @@ bool GlobalPlanner::makePlan(const geometry_msgs::PoseStamped& start, const geom
       last_goal_y = goal.pose.position.y;
       ROS_INFO("NEW GOAL, setting last goal to: %f %f", last_goal_x, last_goal_y);
     } else {
-      // the goal remained the same, try to re-use the former plan if it is still valid
-      unsigned char cur_cost = 255;
-      bool previous_plan_valid = true;
 
-      for (int i = 0; i < previous_plan.size() && previous_plan_valid == true; i++) {
-        worldCost(previous_plan[i].pose.position.x, previous_plan[i].pose.position.y, cur_cost);
-        if (cur_cost > pot_field_max_cost_) {
-          previous_plan_valid = false;
+      if (fabs(last_official_goal_x - last_goal_x) > 0.1 || fabs(last_official_goal_y - last_goal_x) > 0.1) {
+        // if we decided to take a goal close to the actual goal we can
+        // check whether the official goal is free now (due to sensor noise / updates etc.)
+        unsigned char cur_cost = 255;
+        worldCost(goal.pose.position.x, goal.pose.position.y, cur_cost);
+        if (cur_cost < pot_field_max_cost_) {
+          last_goal_x = last_official_goal_x;
+          last_goal_y = last_official_goal_y;
         }
-      }
+      } else {
+        // the goal remained the same, try to re-use the former plan if it is still valid
+        unsigned char cur_cost = 255;
+        bool previous_plan_valid = true;
+        for (int i = 0; i < previous_plan.size() && previous_plan_valid == true; i++) {
+          worldCost(previous_plan[i].pose.position.x, previous_plan[i].pose.position.y, cur_cost);
+          if (cur_cost > pot_field_max_cost_) {
+            previous_plan_valid = false;
+          }
+        }
 
       if (previous_plan_valid == true) {
 
@@ -259,6 +269,7 @@ bool GlobalPlanner::makePlan(const geometry_msgs::PoseStamped& start, const geom
         publishPlan(previous_plan);
 
         return !previous_plan.empty();
+        }
       }
     }
 
