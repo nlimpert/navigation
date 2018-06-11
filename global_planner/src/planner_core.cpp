@@ -236,7 +236,30 @@ bool GlobalPlanner::makePlan(const geometry_msgs::PoseStamped& start, const geom
       last_goal_x = goal.pose.position.x;
       last_goal_y = goal.pose.position.y;
       ROS_INFO("NEW GOAL, setting last goal to: %f %f", last_goal_x, last_goal_y);
+    } else {
+      // the goal remained the same, try to re-use the former plan if it is still valid
+      unsigned char cur_cost = 255;
+      bool previous_plan_valid = true;
+
+      for (int i = 0; i < previous_plan.size() && previous_plan_valid == true; i++) {
+        worldCost(previous_plan[i].pose.position.x, previous_plan[i].pose.position.y, cur_cost);
+        if (cur_cost > pot_field_max_cost_) {
+          previous_plan_valid = false;
+        }
+      }
+
+      if (previous_plan_valid == true) {
+
+        // create a copy of the calculated plan
+        plan.clear();
+
+        //publish the plan for visualization purposes
+        publishPlan(previous_plan);
+
+        return !previous_plan.empty();
+      }
     }
+
     if (!initialized_) {
         ROS_ERROR(
                 "This planner has not been initialized yet, but it is being used, please call initialize() before use");
@@ -245,6 +268,7 @@ bool GlobalPlanner::makePlan(const geometry_msgs::PoseStamped& start, const geom
 
     //clear the plan, just in case
     plan.clear();
+    previous_plan.clear();
 
     ros::NodeHandle n;
     std::string global_frame = frame_id_;
@@ -485,6 +509,7 @@ bool GlobalPlanner::makePlan(const geometry_msgs::PoseStamped& start, const geom
             geometry_msgs::PoseStamped goal_copy = goal_;
             goal_copy.header.stamp = ros::Time::now();
             plan.push_back(goal_copy);
+            previous_plan.push_back(goal_copy);
         } else {
             ROS_ERROR("Failed to get a plan from potential when a legal potential was found. This shouldn't happen.");
         }
@@ -575,10 +600,12 @@ bool GlobalPlanner::getPlanFromPotential(double start_x, double start_y, double 
         pose.pose.orientation.z = 0.0;
         pose.pose.orientation.w = 1.0;
         plan.push_back(pose);
+        previous_plan.push_back(pose);
     }
     if(old_navfn_behavior_){
             plan.push_back(goal);
     }
+
     return !plan.empty();
 }
 

@@ -230,6 +230,8 @@ class GlobalPlanner : public nav_core::BaseGlobalPlanner {
         double last_official_goal_x;
         double last_official_goal_y;
 
+        std::vector<geometry_msgs::PoseStamped> previous_plan;
+
 };
 
 } //end namespace global_planner
