@@ -73,5 +73,23 @@ void ClearCostmapRecovery::runBehavior(){
 
   std_srvs::Empty srv;
   client.call(srv);
+
+  dynamic_reconfigure::ReconfigureRequest dynreconf_srv_req;
+  dynamic_reconfigure::ReconfigureResponse dynreconf_srv_resp;
+  dynamic_reconfigure::BoolParameter dynreconf_bool_param;
+  dynamic_reconfigure::Config dynreconf_conf;
+
+  dynreconf_bool_param.name = "allow_backprojection";
+  dynreconf_bool_param.value = true;
+  dynreconf_conf.bools.push_back(dynreconf_bool_param);
+  dynreconf_srv_req.config = dynreconf_conf;
+
+  if (! ros::service::call("/move_base/GlobalPlanner/set_parameters", dynreconf_srv_req, dynreconf_srv_resp)) {
+      ROS_ERROR("Failed to send dynreconf");
+      dynreconf_conf.doubles.clear();
+  } else {
+      ROS_ERROR("Sent dynreconf to global planner");
+      dynreconf_conf.doubles.clear();
+  }
 }
 };
