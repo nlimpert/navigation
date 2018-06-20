@@ -260,16 +260,17 @@ bool GlobalPlanner::makePlan(const geometry_msgs::PoseStamped& start, const geom
           }
         }
 
-      if (previous_plan_valid == true) {
-
-        // create a copy of the calculated plan
-        plan.clear();
-
-        //publish the plan for visualization purposes
-        publishPlan(previous_plan);
-
-        return !previous_plan.empty();
-        }
+//      if (previous_plan_valid == true) {
+//
+//        // create a copy of the calculated plan
+//        plan.clear();
+//
+//        //publish the plan for visualization purposes
+//        ROS_INFO("USING PREVIOUS PLAN: %u", previous_plan.size());
+//        publishPlan(previous_plan);
+//
+//        return !previous_plan.empty();
+//        }
       }
     }
 
