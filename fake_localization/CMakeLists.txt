@@ -14,8 +14,6 @@ find_package(catkin REQUIRED
         )
 
 
-find_package(Boost REQUIRED COMPONENTS signals)
-
 catkin_package(
     CATKIN_DEPENDS
         geometry_msgs
