@@ -320,8 +320,6 @@ bool GlobalPlanner::makePlan(const geometry_msgs::PoseStamped& start, const geom
     if(outline_map_)
         outlineMap(costmap_->getCharMap(), nx, ny, costmap_2d::LETHAL_OBSTACLE);
 
-    ROS_INFO("got goal: %f %f", goal_x, goal_y);
-
     bool found_legal = planner_->calculatePotentials(costmap_->getCharMap(), start_x, start_y, goal_x, goal_y,
                                                     nx * ny * 2, potential_array_);
 
@@ -335,8 +333,6 @@ bool GlobalPlanner::makePlan(const geometry_msgs::PoseStamped& start, const geom
       double temp_wx = goal.pose.position.x;
       double temp_wy = goal.pose.position.y;
       unsigned char cur_cost = 255;
-
-      ROS_INFO("Trying to find alternative pose");
 
       //TODO: patch req.tolerance to something meaningful.
       //if(req.tolerance > 0.0 && req.tolerance < search_increment) search_increment = req.tolerance;
@@ -374,8 +370,6 @@ bool GlobalPlanner::makePlan(const geometry_msgs::PoseStamped& start, const geom
 //                    worldToMap(temp_wx, temp_wy, goal_x, goal_y);
 //                }
 
-                ROS_INFO("try at %f %f", temp_wx, temp_wy);
-
                 worldCost(temp_wx, temp_wy, cur_cost);
 
                 // only look for a path if the cell actually matches our desired
@@ -384,7 +378,6 @@ bool GlobalPlanner::makePlan(const geometry_msgs::PoseStamped& start, const geom
                                                                       nx * ny * 2, potential_array_);
 
                   if(found_legal == true){
-                    ROS_INFO("I've found a valid pose!");
                     goal_copy.pose.position.x = temp_wx;
                     goal_copy.pose.position.y = temp_wy;
 
