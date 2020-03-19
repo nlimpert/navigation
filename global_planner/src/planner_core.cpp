@@ -334,8 +334,6 @@ bool GlobalPlanner::makePlan(const geometry_msgs::PoseStamped& start, const geom
       double temp_wy = goal.pose.position.y;
       unsigned char cur_cost = 255;
 
-      ROS_INFO("Trying to find alternative pose");
-
       //TODO: patch req.tolerance to something meaningful.
       //if(req.tolerance > 0.0 && req.tolerance < search_increment) search_increment = req.tolerance;
 
